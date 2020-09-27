@@ -1,18 +1,26 @@
 package jrkpi2;
 
+import jrkpi2.Utils.Format;
 import jrkpi2.errors.InvalidDataException;
+import jrkpi2.errors.SampleFormatMismatch;
 
-import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
-public class Decoder extends FilterInputStream {
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+
+import java.util.Arrays;
+
+public class Decoder {
+    private final InputStream in;
+
     private final int format;
     private final int sampleRate;
     private final int numChannels;
 
     public Decoder(InputStream in) throws IOException, InvalidDataException {
-        super(in);
+        this.in = in;
 
         byte[] header = new byte[2];
         if(in.read(header) != 2)
@@ -38,5 +46,50 @@ public class Decoder extends FilterInputStream {
 
     public int getSampleRate() {
         return sampleRate;
+    }
+
+    private byte[] readAligned(int numSamples) throws IOException {
+        int blockSize = numChannels * Utils.getFormatSize(format);
+        byte[] buffer = new byte[numSamples * blockSize];
+
+        // align to the closest possible sample-block boundary.
+        return Arrays.copyOf(buffer, blockSize * (in.read(buffer) / blockSize));
+    }
+
+    public byte[] decodeInt8(int numSamples) throws IOException, SampleFormatMismatch {
+        if(format != Format.SIGNED_8)
+            throw new SampleFormatMismatch("Samples are not to be interpreted as Signed 8-bit");
+
+        return readAligned(numSamples);
+    }
+
+    public short[] decodeInt16(int numSamples) throws IOException, SampleFormatMismatch {
+        if(format != Format.SIGNED_16)
+            throw new SampleFormatMismatch("Samples are not to be interpreted as Signed 16-bit");
+
+        return ByteBuffer.wrap(readAligned(numSamples))
+                         .order(ByteOrder.BIG_ENDIAN)
+                         .asShortBuffer()
+                         .array();
+    }
+
+    public float[] decodeFloat32(int numSamples) throws IOException, SampleFormatMismatch {
+        if(format != Format.FLOAT_32)
+            throw new SampleFormatMismatch("Samples are not to be interpreted as Float 32-bit");
+
+        return ByteBuffer.wrap(readAligned(numSamples))
+                .order(ByteOrder.BIG_ENDIAN)
+                .asFloatBuffer()
+                .array();
+    }
+
+    public double[] decodeFloat64(int numSamples) throws IOException, SampleFormatMismatch {
+        if(format != Format.FLOAT_64)
+            throw new SampleFormatMismatch("Samples are not to be interpreted as Float 64-bit");
+
+        return ByteBuffer.wrap(readAligned(numSamples))
+                .order(ByteOrder.BIG_ENDIAN)
+                .asDoubleBuffer()
+                .array();
     }
 }
