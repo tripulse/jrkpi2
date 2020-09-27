@@ -88,4 +88,12 @@ public class Encoder {
         buffer.asDoubleBuffer().put(samples);
         out.write(buffer.array());
     }
+
+    public void flush() throws IOException {
+        out.flush();
+    }
+
+    public void close() throws IOException {
+        out.close();
+    }
 }
